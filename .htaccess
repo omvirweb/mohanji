@@ -1,0 +1,15 @@
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php/$1 [L]
+</IfModule>
+<FilesMatch \.php$>
+    # Apache 2.4.10+ can proxy to unix socket
+    SetHandler "proxy:unix:/var/run/php/php7.0-fpm.sock|fcgi://localhost"
+</FilesMatch>
+
+php_value max_input_vars 50000000
+php_value suhosin.get.max_vars 50000000
+php_value suhosin.post.max_vars 50000000
+php_value suhosin.request.max_vars 50000000

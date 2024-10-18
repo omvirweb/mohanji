@@ -1,0 +1,5 @@
+Department,Category Group ( 1 = Gold and 2 = Silver ),Category,Item,Gr.Wt.,Less,Net.Wt.,Tunch,Design No,RFID,Stock Method,PCS
+Sales MAIN,1,Gold,Chains,15,0,15,92.6,1001,111,Default,0
+Sales MAIN,1,Gold,LADIES RING,4.25,0.25,4,92.6,1002,112,Item Wise,0
+Sales MAIN,1,Gold,PANDENT SET,15.25,1.25,14,92.6,1003,123,Item Wise,0
+Sales MAIN,1,Gold,RING GENTS,6.5,0.1,6.4,92.6,1004,124,Default,0
