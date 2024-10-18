@@ -497,13 +497,22 @@
                 <td class="text-right" ><?php echo number_format($total_silver_fine, 3, '.', ''); ?></td>
                 <td class="text-right"><?php echo number_format($total_amount, 2, '.', ''); ?></td>
                 <td class="text-right" style="width:50px;">Old Bal.</td>
-                <td class="text-right"><?php echo number_format($sell_data->old_gold_fine, 3, '.', ''); ?></td>
-                <td class="text-right"><?php echo number_format($sell_data->old_silver_fine, 3, '.', ''); ?></td>
-                <td class="text-right"><?php echo number_format($sell_data->old_amount, 2, '.', ''); ?></td>
+                <!--<td class="text-right"><?php //echo number_format($sell_data->old_gold_fine, 3, '.', ''); ?></td>-->
+                <td class="text-right"><?php echo number_format(($gold_fine_cust_ledger - $total_gold_fine), 3, '.', ''); ?></td>
+                <!--<td class="text-right"><?php //echo number_format($sell_data->old_silver_fine, 3, '.', ''); ?></td>-->
+                <td class="text-right"><?php echo number_format(($silver_fine_cust_ledger - $total_silver_fine), 3, '.', ''); ?></td>
+                <!--<td class="text-right"><?php //echo number_format($sell_data->old_amount, 2, '.', ''); ?></td>-->
+				<td class="text-right"><?php echo number_format(($amount_cust_ledger - $total_amount), 3, '.', ''); ?></td>
                 <td class="text-right" style="width:50px;">Net Bal.</td>
-                <td class="text-right"><?php echo number_format(($sell_data->old_gold_fine + $total_gold_fine), 3, '.', ''); ?></td>
-                <td class="text-right"><?php echo number_format(($sell_data->old_silver_fine + $total_silver_fine), 3, '.', ''); ?></td>
-                <td class="text-right"><?php echo number_format(($sell_data->old_amount + $total_amount), 2, '.', ''); ?></td>
+                <!--<td class="text-right"><?php //echo number_format(($sell_data->old_gold_fine + $total_gold_fine), 3, '.', ''); ?></td>-->
+				<td class="text-right"><?php echo number_format($gold_fine_cust_ledger, 3, '.', ''); ?></td>
+				
+                <!--<td class="text-right"><?php //echo number_format(($sell_data->old_silver_fine + $total_silver_fine), 3, '.', ''); ?></td>-->
+				
+				<td class="text-right"><?php echo number_format($silver_fine_cust_ledger, 3, '.', ''); ?></td>
+				
+                <!--<td class="text-right"><?php //echo number_format(($sell_data->old_amount + $total_amount), 2, '.', ''); ?></td>-->
+                <td class="text-right"><?php echo number_format($amount_cust_ledger, 2, '.', ''); ?></td>
             </tr>
         </table>
         <?php if(isset($isimage)){ ?>

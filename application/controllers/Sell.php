@@ -16,6 +16,9 @@ class Sell extends CI_Controller {
         if (!$this->session->userdata(PACKAGE_FOLDER_NAME.'is_logged_in')) {
             redirect('/auth/login/');
         }
+		
+		
+		
         $this->logged_in_id = $this->session->userdata(PACKAGE_FOLDER_NAME.'is_logged_in')['user_id'];
         $this->sell_purchase_difference = $this->session->userdata(PACKAGE_FOLDER_NAME.'sell_purchase_difference');
         $this->now_time = date('Y-m-d H:i:s');
@@ -588,6 +591,15 @@ class Sell extends CI_Controller {
     
     function get_account_old_balance($account_id){
         $data = array();
+		$post_data = array();
+		
+		//mehulshukla developer here
+		$from_date = date('Y-m-d');
+		$to_date = date('Y-m-d');
+		$type_sort = '';
+		$display_opening = 1;
+		 $display_opening = 1;
+		 $offset = 0;
         if(!empty($account_id)){
             $account_data = $this->crud->get_row_by_id('account',array('account_id' => $account_id));
             if(!empty($account_data)){
@@ -967,6 +979,363 @@ class Sell extends CI_Controller {
                 }
                 $data['effective_credit_limit'] = $effective_credit_limit;
                 $data['account_remarks'] = $account_data[0]->account_remarks;
+				
+				
+				//customer ledger logic here 
+				$post_data['view_only_hisab'] = 0;
+				if ($display_opening == 1 && $offset == 0) 
+				{
+					$opening_data = $this->get_opening_customer_ledger($from_date, $account_id, $type_sort, $post_data['view_only_hisab']);
+				} 
+				else 
+				{
+					$opening_data = array();
+				}
+				$account_group_id = $this->crud->get_column_value_by_id('account', 'account_group_id', array('account_id' => $account_id));
+				if($account_group_id == DEPARTMENT_GROUP){
+					$customer_ledger_data = $this->applib->get_customer_ledger_department_data_arr($from_date, $to_date, $account_id, $type_sort, $offset);
+				} else {
+					$customer_ledger_data = $this->applib->get_customer_ledger_data_arr($from_date, $to_date, $account_id, $type_sort, $post_data['view_only_hisab'], $offset);
+				}
+				
+				$display_line_item_remark_in_ledger = $this->crud->get_column_value_by_id('settings', 'settings_value', array('settings_key' => 'display_line_item_remark_in_ledger'));
+
+				$customer_ledger_data = array_merge($opening_data, $customer_ledger_data);
+				$customer_ledger_data = array_values($customer_ledger_data);
+				
+				$data2 = array();
+				$total_grwt = 0;
+				$total_less = 0;
+				$total_net_wt = 0;
+				$total_gold_fine = 0;
+				$daywise_total_gold_fine = 0;
+				$daywise_total_silver_fine = 0;
+				$daywise_total_amount = 0;
+				$total_silver_fine = 0;
+				$total_amount = 0;
+				$total_c_amount = 0;
+				$total_r_amount = 0;
+				
+				$gold_total_grwt = 0;
+				$gold_total_less = 0;
+				$gold_total_net_wt = 0;
+				$gold_total_gold_fine = 0;
+				$gold_total_silver_fine = 0;
+				
+				$silver_total_grwt = 0;
+				$silver_total_less = 0;
+				$silver_total_net_wt = 0;
+				$silver_total_gold_fine = 0;
+				$silver_total_silver_fine = 0;
+
+				$daterange_total_amount = 0;
+				$current_date = '';
+				
+				//        echo '<pre>'; print_r($customer_ledger_data); exit;
+        foreach ($customer_ledger_data as $key => $customer_ledger) {
+            $action = '';
+            $department_ids = $this->applib->current_user_department_ids();
+            if($display_opening != 1 || ($display_opening == 1 && $key != '0')){
+                    if($customer_ledger->type_sort == 'ST F' || $customer_ledger->type_sort == 'ST T'){
+                        if($this->app_model->have_access_role(STOCK_TRANSFER_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                $action .= '<a href="' . base_url("stock_transfer/stock_transfer/" . $customer_ledger->stock_transfer_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'MFI' || $customer_ledger->type_sort == 'MFR' || $customer_ledger->type_sort == 'IRKW'){
+                        if($this->app_model->have_access_role(ISSUE_RECEIVE_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                if($customer_ledger->hisab_done != '1'){
+                                    $action .= '<a href="' . base_url("manufacture/issue_receive/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'MFIS' || $customer_ledger->type_sort == 'MFRS'){
+                        if($this->app_model->have_access_role(ISSUE_RECEIVE_SILVER_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                if($customer_ledger->hisab_done != '1'){
+                                    $action .= '<a href="' . base_url("manufacture_silver/issue_receive_silver/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'MHMIFW' || $customer_ledger->type_sort == 'MHMIS' || $customer_ledger->type_sort == 'MHMRFW' || $customer_ledger->type_sort == 'MHMRS'){
+                        if($this->app_model->have_access_role(MANU_HAND_MADE_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                if($customer_ledger->hisab_done != '1'){
+                                    $action .= '<a href="' . base_url("manu_hand_made/manu_hand_made/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'CASTINGIFW' || $customer_ledger->type_sort == 'CASTINGIS' || $customer_ledger->type_sort == 'CASTINGRFW' || $customer_ledger->type_sort == 'CASTINGRS'){
+                        if($this->app_model->have_access_role(CASTING_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                if($customer_ledger->hisab_done != '1'){
+                                    $action .= '<a href="' . base_url("casting/casting_entry/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'MCHAINIFW' || $customer_ledger->type_sort == 'MCHAINIS' || $customer_ledger->type_sort == 'MCHAINRFW' || $customer_ledger->type_sort == 'MCHAINRS'){
+                        if($this->app_model->have_access_role(MACHINE_CHAIN_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                if($customer_ledger->hisab_done != '1'){
+                                    $action .= '<a href="' . base_url("machine_chain/machine_chain/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'O P' || $customer_ledger->type_sort == 'O S' || $customer_ledger->type_sort == 'O Payment' || $customer_ledger->type_sort == 'O Receipt'){
+                        if($this->app_model->have_access_role(OTHER_ENTRY_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                $action .= '<a href="' . base_url("other/add/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'Hisab Fine' || $customer_ledger->type_sort == 'HD-I' || $customer_ledger->type_sort == 'HD-R' || $customer_ledger->type_sort == 'Hisab Fine S' || $customer_ledger->type_sort == 'HD-I S' || $customer_ledger->type_sort == 'HD-R S' || $customer_ledger->type_sort == 'MHM Hisab Fine' || $customer_ledger->type_sort == 'MHM HD-I' || $customer_ledger->type_sort == 'MHM HD-R' || $customer_ledger->type_sort == 'CASTING Hisab Fine' || $customer_ledger->type_sort == 'CASTING HD-I' || $customer_ledger->type_sort == 'CASTING HD-R' || $customer_ledger->type_sort == 'MCHAIN Hisab Fine' || $customer_ledger->type_sort == 'MCHAIN HD-I' || $customer_ledger->type_sort == 'MCHAIN HD-R'){
+                        $action .= '';
+                    } else {
+                        if(isset($customer_ledger->journal_id) && !empty($customer_ledger->journal_id)){
+                            if($this->app_model->have_access_role(JOURNAL_MODULE_ID, "edit")){
+                                if (in_array($customer_ledger->department_id, $department_ids)){
+                                    $action .= '<a href="' . base_url("journal/add/" . $customer_ledger->journal_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        } else if($customer_ledger->type_sort == 'GST Bill'){
+                            if($this->app_model->have_access_role(SELL_PURCHASE_MODULE_ID, "edit")){
+                                if (in_array($customer_ledger->department_id, $department_ids)){
+                                    $action .= '<a href="' . base_url("sell_with_gst/add/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        } else if(isset($customer_ledger->st_id) && !empty($customer_ledger->st_id)){
+                            if($this->app_model->have_access_role(SELL_PURCHASE_MODULE_ID, "edit")){
+                                if (in_array($customer_ledger->department_id, $department_ids)){
+                                    $action .= '<a href="' . base_url("sell/add/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        } else if(isset($customer_ledger->pay_rece_id) && !empty($customer_ledger->pay_rece_id)){
+                            if($this->app_model->have_access_role(CASHBOOK_MODULE_ID, "edit")){
+                                if (in_array($customer_ledger->department_id, $department_ids)){
+                                    $action .= '<a href="' . base_url("reports/cashbook/" . $customer_ledger->pay_rece_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        } else if(isset($customer_ledger->xrf_id) && !empty($customer_ledger->xrf_id)){
+                            if($this->app_model->have_access_role(HALLMARK_XRF_MODULE_ID, "edit")){
+                                if (in_array(XRF_HM_LASER_DEPARTMENT_ACCOUNT_ID, $department_ids)){
+                                    $action .= '<a href="' . base_url("hallmark/xrf/" . $customer_ledger->xrf_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    }
+                }
+                    
+//            if(empty($customer_ledger->gold_fine) && empty($customer_ledger->silver_fine) && empty($customer_ledger->amount) && $post_data['from_zero'] == 1 ){
+            if(empty($customer_ledger->gold_fine) && empty($customer_ledger->silver_fine) && empty($customer_ledger->amount) && $post_data['from_zero'] == 1 && isset($customer_ledger->group_name) ? $customer_ledger->group_name != '3' : ''){
+                $data2 = array();
+            } else {
+                
+                if($current_date != '' && $current_date != $customer_ledger->st_date){
+                    $row = array();
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '<b>Total</b>';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '';
+//                    $row[] = '<b>' . number_format((float) $total_grwt, 3, '.', '') . '</b>';
+//                    $row[] = '<b>' . number_format((float) $total_less, 3, '.', '') . '</b>';
+//                    $row[] = '<b>' . number_format((float) $total_net_wt, 3, '.', '') . '</b>';
+                    if ($total_gold_fine != 0 && $total_net_wt != 0) {
+                        $tunch = number_format((float) $total_gold_fine * 100 / (float) $total_net_wt, 2, '.', '');
+                    } else {
+                        $tunch = 0;
+                    }
+//                    $row[] = '<b>' . $tunch . '</b>';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '<b>' . number_format((float) $total_gold_fine, 3, '.', '') . '</b>';
+                    $row[] = '<b>' . number_format((float) $total_silver_fine, 3, '.', '') . '</b>';
+                    $row[] = '<b>' . number_format((float) $total_amount, 2, '.', '') . '</b>';
+                    $row[] = '<b>' . number_format((float) $total_c_amount, 2, '.', '') . '</b>';
+                    $row[] = '<b>' . number_format((float) $total_r_amount, 2, '.', '') . '</b>';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = $total_gold_fine;
+                    $row[] = $total_silver_fine;
+                    $row[] = $total_amount;
+                    $data2[] = $row;
+                    $daywise_total_gold_fine = $daywise_total_gold_fine + $total_gold_fine;
+                    $daywise_total_silver_fine = $daywise_total_silver_fine + $total_silver_fine;
+                    $daywise_total_amount = $daywise_total_amount + $total_amount;
+                } 
+                $current_date = $customer_ledger->st_date;
+                if(empty($customer_ledger->gold_fine) && empty($customer_ledger->silver_fine) && empty($customer_ledger->amount) && $post_data['from_zero'] == 1 && isset($customer_ledger->group_name) ? $customer_ledger->group_name == '3' : ''){
+                    $gold_total_grwt = 0;
+                    $gold_total_less = 0;
+                    $gold_total_net_wt = 0;
+
+                    $silver_total_grwt = 0;
+                    $silver_total_less = 0;
+                    $silver_total_net_wt = 0;
+                }
+//                if(empty($customer_ledger->gold_fine) && empty($customer_ledger->silver_fine) && empty($customer_ledger->amount) && $post_data['from_zero'] == 1){
+                if(empty($customer_ledger->gold_fine) && empty($customer_ledger->silver_fine) && empty($customer_ledger->amount) && $post_data['from_zero'] == 1 && isset($customer_ledger->group_name) ? $customer_ledger->group_name != '3' : ''){
+                    $total_grwt = 0;
+                    $total_less = 0;
+                    $total_net_wt = 0;
+                    $total_gold_fine = 0;
+                    $total_silver_fine = 0;
+                    $total_amount = 0;
+                    
+                    $gold_total_grwt = 0;
+                    $gold_total_less = 0;
+                    $gold_total_net_wt = 0;
+                    $gold_total_gold_fine = 0;
+                    $gold_total_silver_fine = 0;
+                    $daterange_total_amount = 0;
+
+                    $silver_total_grwt = 0;
+                    $silver_total_less = 0;
+                    $silver_total_net_wt = 0;
+                    $silver_total_gold_fine = 0;
+                    $silver_total_silver_fine = 0;
+//                    $silver_total_amount = 0;
+                } else {
+                    if (($display_opening != 1 || ($display_opening == 1 && $key != '0')) || ($display_opening == 1 && $key == '0')) {
+                        $total_grwt = number_format((float) $total_grwt, 3, '.', '') + number_format((float) $customer_ledger->grwt, 3, '.', '');
+                        $total_less = number_format((float) $total_less, 3, '.', '') + number_format((float) $customer_ledger->less, 3, '.', '');
+                        $total_net_wt = number_format((float) $total_net_wt, 3, '.', '') + number_format((float) $customer_ledger->net_wt, 3, '.', '');
+                        $total_gold_fine = number_format((float) $total_gold_fine, 3, '.', '') + number_format((float) $customer_ledger->gold_fine, 3, '.', '');
+                        $total_silver_fine = number_format((float) $total_silver_fine, 3, '.', '') + number_format((float) $customer_ledger->silver_fine, 3, '.', '');
+                        $total_amount = number_format((float) $total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                        
+                        if($key != '0'){
+                            if($customer_ledger->group_name == CATEGORY_GROUP_GOLD_ID){
+                                $gold_total_grwt = number_format((float) $gold_total_grwt, 3, '.', '') + number_format((float) $customer_ledger->grwt, 3, '.', '');
+                                $gold_total_less = number_format((float) $gold_total_less, 3, '.', '') + number_format((float) $customer_ledger->less, 3, '.', '');
+                                $gold_total_net_wt = number_format((float) $gold_total_net_wt, 3, '.', '') + number_format((float) $customer_ledger->net_wt, 3, '.', '');
+                                $gold_total_gold_fine = number_format((float) $gold_total_gold_fine, 3, '.', '') + number_format((float) $customer_ledger->gold_fine, 3, '.', '');
+//                                $gold_total_silver_fine = number_format((float) $gold_total_silver_fine, 3, '.', '') + number_format((float) $customer_ledger->silver_fine, 3, '.', '');
+                                $daterange_total_amount = number_format((float) $daterange_total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                            } else if($customer_ledger->group_name == CATEGORY_GROUP_SILVER_ID){
+                                $silver_total_grwt = number_format((float) $silver_total_grwt, 3, '.', '') + number_format((float) $customer_ledger->grwt, 3, '.', '');
+                                $silver_total_less = number_format((float) $silver_total_less, 3, '.', '') + number_format((float) $customer_ledger->less, 3, '.', '');
+                                $silver_total_net_wt = number_format((float) $silver_total_net_wt, 3, '.', '') + number_format((float) $customer_ledger->net_wt, 3, '.', '');
+//                                $silver_total_gold_fine = number_format((float) $silver_total_gold_fine, 3, '.', '') + number_format((float) $customer_ledger->gold_fine, 3, '.', '');
+                                $silver_total_silver_fine = number_format((float) $silver_total_silver_fine, 3, '.', '') + number_format((float) $customer_ledger->silver_fine, 3, '.', '');
+                                $daterange_total_amount = number_format((float) $daterange_total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                            } else if($customer_ledger->group_name == CATEGORY_GROUP_OTHER_ID){
+                                $daterange_total_amount = number_format((float) $daterange_total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                            } else if($customer_ledger->group_name == '4'){ // Payment Receipt, Journal, Cashbook
+                                if($customer_ledger->type_sort == 'Payment' || $customer_ledger->type_sort == 'Receipt' || $customer_ledger->type_sort == 'J Naam' || $customer_ledger->type_sort == 'J Jama' || $customer_ledger->type_sort == 'C R' || $customer_ledger->type_sort == 'C P' || $customer_ledger->type_sort == 'O Payment' || $customer_ledger->type_sort == 'O Receipt'){
+                                    $daterange_total_amount = number_format((float) $daterange_total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                                } elseif ($customer_ledger->type_sort == 'TR Naam' || $customer_ledger->type_sort == 'TR Jama') {
+                                    $gold_total_gold_fine = number_format((float) $gold_total_gold_fine, 3, '.', '') + number_format((float) $customer_ledger->gold_fine, 3, '.', '');
+                                    $silver_total_silver_fine = number_format((float) $silver_total_silver_fine, 3, '.', '') + number_format((float) $customer_ledger->silver_fine, 3, '.', '');
+                                    $daterange_total_amount = number_format((float) $daterange_total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                $row = array();
+                $row[] = $action;
+                $row[] = (!empty(strtotime($customer_ledger->st_date))) ? date('d-m-Y', strtotime($customer_ledger->st_date)) : '';
+                $particular = ($customer_ledger->account_name != 'account_name') ? $customer_ledger->account_name : '' ;
+                $particular .= (isset($customer_ledger->interest_account_id) && $customer_ledger->interest_account_id == $customer_ledger->account_id) ? ' <a href="' . base_url("reports/interest/" . $customer_ledger->journal_id . "/" . $customer_ledger->account_id ) . '" target="_blank" title="Interest" ><b>Interest</b></a>' : '' ;
+                if($customer_ledger->type_sort == 'E' || $customer_ledger->type_sort == 'P' || $customer_ledger->type_sort == 'S'){
+                    if($display_line_item_remark_in_ledger == '1'){
+                        $particular .= '<small> - '.$customer_ledger->li_narration . '</small>';
+                    }
+                    if(PACKAGE_FOR == 'manek' && $account_group_id != DEPARTMENT_GROUP) {
+                        $charges_details = "SELECT GROUP_CONCAT(CONCAT(`ad`.`ad_name`, '@', `sell_item_charges_details`.`sell_item_charges_details_ad_amount`)) AS charges_details FROM `sell_item_charges_details`";
+                        $charges_details .= " JOIN `ad` ON `ad`.`ad_id` = `sell_item_charges_details`.`sell_item_charges_details_ad_id`";
+                        $charges_details .= " WHERE `sell_item_charges_details`.`sell_item_id` = " . $customer_ledger->sell_item_id;
+                        $charges_details = $this->crud->getFromSQLArray($charges_details);
+                        $charges_details = (!empty($charges_details)) ? $charges_details[0]['charges_details'] : '';
+                        $particular .= (isset($charges_details) && !empty($charges_details)) ? ' <br><small>' . $charges_details . '</small>' : '';
+                    }
+                }
+                if($customer_ledger->type_sort == 'Payment' || $customer_ledger->type_sort == 'Receipt'){
+                    $particular .= '<small> - '.$customer_ledger->narration . '</small>';
+                }
+                if($customer_ledger->type_sort == 'M R' || $customer_ledger->type_sort == 'M P'){
+                    $particular .= '<small> - '.$customer_ledger->metal_narration . '</small>';
+                }
+                if($customer_ledger->type_sort == 'GB S' || $customer_ledger->type_sort == 'GB P'){
+                    $particular .= ' @'.$customer_ledger->gold_rate . '<small> - '.$customer_ledger->gold_narration . '</small>';
+                }
+                if($customer_ledger->type_sort == 'SB S' || $customer_ledger->type_sort == 'SB P'){
+                    $particular .= ' @'.$customer_ledger->silver_rate;
+                }
+                if($customer_ledger->type_sort == 'J Naam'){
+                    $account_names = $this->crud->getFromSQL('SELECT account.account_name FROM journal_details JOIN account ON account.account_id = journal_details.account_id WHERE journal_details.journal_id = "' . $customer_ledger->journal_id . '" AND journal_details.type = 2');
+                    if(!empty($account_names)){
+                        $particular .= ' @ ';
+                        foreach($account_names as $an_row){
+                            $particular .= $an_row->account_name . ', ';
+                        }
+                    }
+                }
+                if($customer_ledger->type_sort == 'J Jama'){
+                    $account_names = $this->crud->getFromSQL('SELECT account.account_name FROM journal_details JOIN account ON account.account_id = journal_details.account_id WHERE journal_details.journal_id = "' . $customer_ledger->journal_id . '" AND journal_details.type = 1');
+                    if(!empty($account_names)){
+                        $particular .= ' @ ';
+                        foreach($account_names as $an_row){
+                            $particular .= $an_row->account_name . ', ';
+                        }
+                    }
+                }
+                $row[] = $particular;
+                $row[] = $customer_ledger->type_sort;
+                if($key == '0' && $customer_ledger->account_name == 'Opening Balance'){
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '';
+                } else {
+                    $row[] = number_format((float) $customer_ledger->grwt, 3, '.', '');
+                    $row[] = number_format((float) $customer_ledger->less, 3, '.', '');
+                    $row[] = number_format((float) $customer_ledger->net_wt, 3, '.', '');
+                    $row[] = number_format((float) $customer_ledger->touch_id, 2, '.', '');
+                    $row[] = number_format((float) $customer_ledger->wstg, 3, '.', '');
+                }
+//                $row[] = number_format((float) $customer_ledger->grwt, 3, '.', '');
+//                $row[] = number_format((float) $customer_ledger->less, 3, '.', '');
+//                $row[] = number_format((float) $customer_ledger->net_wt, 3, '.', '');
+//                $row[] = number_format((float) $customer_ledger->touch_id, 2, '.', '');
+//                $row[] = number_format((float) $customer_ledger->wstg, 3, '.', '');
+                $row[] = number_format((float) $customer_ledger->gold_fine, 3, '.', '');
+                $row[] = number_format((float) $customer_ledger->silver_fine, 3, '.', '');
+                $row[] = number_format((float) $customer_ledger->amount, 2, '.', '');
+                $c_amt = '';
+                if(isset($customer_ledger->c_amt)){
+                    $c_amt = number_format((float) $customer_ledger->c_amt, 2, '.', '');
+                    $total_c_amount = $total_c_amount + $c_amt;
+                }
+                $row[] = $c_amt;
+                $r_amt = '';
+                if(isset($customer_ledger->r_amt)){
+                    $r_amt = number_format((float) $customer_ledger->r_amt, 2, '.', '');
+                    $total_r_amount = $total_r_amount + $r_amt;
+                }
+                $row[] = $r_amt;
+                $row[] = $customer_ledger->created_at;
+                $row[] = $customer_ledger->reference_no;
+                $row[] = $total_gold_fine;
+                $row[] = $total_silver_fine;
+                $row[] = $total_amount;
+                $data2[] = $row;
+            }
+        }
+		$daywise_total_gold_fine = $daywise_total_gold_fine + $total_gold_fine;
+        $daywise_total_silver_fine = $daywise_total_silver_fine + $total_silver_fine;
+        $daywise_total_amount = $daywise_total_amount + $total_amount;
+		
+		$data['gold_fine']	= $daywise_total_gold_fine;
+		$data['silver_fine'] = $daywise_total_silver_fine;
+		$data['amount'] = $daywise_total_amount;
+        //print_r($post_data);die;
+				//==========================================
             }
         }
         // echo "<pre>";
@@ -4010,7 +4379,17 @@ class Sell extends CI_Controller {
     }
 
     function sell_print($sell_id = '', $isimage = '') {
-        $data = array();
+        
+		$data = array();
+		
+		//mehulshukla developer here
+		$post_data = array();
+		$from_date = date('Y-m-d');
+		$to_date = date('Y-m-d');
+		$type_sort = '';
+		$display_opening = 1;
+		$display_opening = 1;
+		$offset = 0;
 
         $setting_data = $this->crud->get_all_records('settings', 'fields_section', 'asc');
         foreach($setting_data as $setting_row){
@@ -4027,6 +4406,7 @@ class Sell extends CI_Controller {
             $sell_data->old_silver_fine = 0;
             $sell_data->old_amount = 0;
             $account_data = $this->crud->get_row_by_id('account',array('account_id' => $sell_data->account_id));
+			$account_id = $sell_data->account_id;
             if(!empty($account_data)){
                 $sell_data->account_name = $account_data[0]->account_name;
                 $sell_data->account_phone = $account_data[0]->account_phone;
@@ -4282,6 +4662,363 @@ class Sell extends CI_Controller {
                 $data['adjust_cr_data'] = implode(',', $adjust_cr_data);
             }
         }
+		
+		//customer ledger logic here 
+				$post_data['view_only_hisab'] = 0;
+				if ($display_opening == 1 && $offset == 0) 
+				{
+					$opening_data = $this->get_opening_customer_ledger($from_date, $account_id, $type_sort, $post_data['view_only_hisab']);
+				} 
+				else 
+				{
+					$opening_data = array();
+				}
+				$account_group_id = $this->crud->get_column_value_by_id('account', 'account_group_id', array('account_id' => $account_id));
+				if($account_group_id == DEPARTMENT_GROUP){
+					$customer_ledger_data = $this->applib->get_customer_ledger_department_data_arr($from_date, $to_date, $account_id, $type_sort, $offset);
+				} else {
+					$customer_ledger_data = $this->applib->get_customer_ledger_data_arr($from_date, $to_date, $account_id, $type_sort, $post_data['view_only_hisab'], $offset);
+				}
+				
+				$display_line_item_remark_in_ledger = $this->crud->get_column_value_by_id('settings', 'settings_value', array('settings_key' => 'display_line_item_remark_in_ledger'));
+
+				$customer_ledger_data = array_merge($opening_data, $customer_ledger_data);
+				$customer_ledger_data = array_values($customer_ledger_data);
+				
+				$data2 = array();
+				$total_grwt = 0;
+				$total_less = 0;
+				$total_net_wt = 0;
+				$total_gold_fine = 0;
+				$daywise_total_gold_fine = 0;
+				$daywise_total_silver_fine = 0;
+				$daywise_total_amount = 0;
+				$total_silver_fine = 0;
+				$total_amount = 0;
+				$total_c_amount = 0;
+				$total_r_amount = 0;
+				
+				$gold_total_grwt = 0;
+				$gold_total_less = 0;
+				$gold_total_net_wt = 0;
+				$gold_total_gold_fine = 0;
+				$gold_total_silver_fine = 0;
+				
+				$silver_total_grwt = 0;
+				$silver_total_less = 0;
+				$silver_total_net_wt = 0;
+				$silver_total_gold_fine = 0;
+				$silver_total_silver_fine = 0;
+
+				$daterange_total_amount = 0;
+				$current_date = '';
+				
+				//        echo '<pre>'; print_r($customer_ledger_data); exit;
+        foreach ($customer_ledger_data as $key => $customer_ledger) {
+            $action = '';
+            $department_ids = $this->applib->current_user_department_ids();
+            if($display_opening != 1 || ($display_opening == 1 && $key != '0')){
+                    if($customer_ledger->type_sort == 'ST F' || $customer_ledger->type_sort == 'ST T'){
+                        if($this->app_model->have_access_role(STOCK_TRANSFER_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                $action .= '<a href="' . base_url("stock_transfer/stock_transfer/" . $customer_ledger->stock_transfer_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'MFI' || $customer_ledger->type_sort == 'MFR' || $customer_ledger->type_sort == 'IRKW'){
+                        if($this->app_model->have_access_role(ISSUE_RECEIVE_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                if($customer_ledger->hisab_done != '1'){
+                                    $action .= '<a href="' . base_url("manufacture/issue_receive/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'MFIS' || $customer_ledger->type_sort == 'MFRS'){
+                        if($this->app_model->have_access_role(ISSUE_RECEIVE_SILVER_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                if($customer_ledger->hisab_done != '1'){
+                                    $action .= '<a href="' . base_url("manufacture_silver/issue_receive_silver/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'MHMIFW' || $customer_ledger->type_sort == 'MHMIS' || $customer_ledger->type_sort == 'MHMRFW' || $customer_ledger->type_sort == 'MHMRS'){
+                        if($this->app_model->have_access_role(MANU_HAND_MADE_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                if($customer_ledger->hisab_done != '1'){
+                                    $action .= '<a href="' . base_url("manu_hand_made/manu_hand_made/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'CASTINGIFW' || $customer_ledger->type_sort == 'CASTINGIS' || $customer_ledger->type_sort == 'CASTINGRFW' || $customer_ledger->type_sort == 'CASTINGRS'){
+                        if($this->app_model->have_access_role(CASTING_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                if($customer_ledger->hisab_done != '1'){
+                                    $action .= '<a href="' . base_url("casting/casting_entry/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'MCHAINIFW' || $customer_ledger->type_sort == 'MCHAINIS' || $customer_ledger->type_sort == 'MCHAINRFW' || $customer_ledger->type_sort == 'MCHAINRS'){
+                        if($this->app_model->have_access_role(MACHINE_CHAIN_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                if($customer_ledger->hisab_done != '1'){
+                                    $action .= '<a href="' . base_url("machine_chain/machine_chain/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'O P' || $customer_ledger->type_sort == 'O S' || $customer_ledger->type_sort == 'O Payment' || $customer_ledger->type_sort == 'O Receipt'){
+                        if($this->app_model->have_access_role(OTHER_ENTRY_MODULE_ID, "edit")){
+                            if (in_array($customer_ledger->department_id, $department_ids)){
+                                $action .= '<a href="' . base_url("other/add/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                            }
+                        }
+                    } else if($customer_ledger->type_sort == 'Hisab Fine' || $customer_ledger->type_sort == 'HD-I' || $customer_ledger->type_sort == 'HD-R' || $customer_ledger->type_sort == 'Hisab Fine S' || $customer_ledger->type_sort == 'HD-I S' || $customer_ledger->type_sort == 'HD-R S' || $customer_ledger->type_sort == 'MHM Hisab Fine' || $customer_ledger->type_sort == 'MHM HD-I' || $customer_ledger->type_sort == 'MHM HD-R' || $customer_ledger->type_sort == 'CASTING Hisab Fine' || $customer_ledger->type_sort == 'CASTING HD-I' || $customer_ledger->type_sort == 'CASTING HD-R' || $customer_ledger->type_sort == 'MCHAIN Hisab Fine' || $customer_ledger->type_sort == 'MCHAIN HD-I' || $customer_ledger->type_sort == 'MCHAIN HD-R'){
+                        $action .= '';
+                    } else {
+                        if(isset($customer_ledger->journal_id) && !empty($customer_ledger->journal_id)){
+                            if($this->app_model->have_access_role(JOURNAL_MODULE_ID, "edit")){
+                                if (in_array($customer_ledger->department_id, $department_ids)){
+                                    $action .= '<a href="' . base_url("journal/add/" . $customer_ledger->journal_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        } else if($customer_ledger->type_sort == 'GST Bill'){
+                            if($this->app_model->have_access_role(SELL_PURCHASE_MODULE_ID, "edit")){
+                                if (in_array($customer_ledger->department_id, $department_ids)){
+                                    $action .= '<a href="' . base_url("sell_with_gst/add/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        } else if(isset($customer_ledger->st_id) && !empty($customer_ledger->st_id)){
+                            if($this->app_model->have_access_role(SELL_PURCHASE_MODULE_ID, "edit")){
+                                if (in_array($customer_ledger->department_id, $department_ids)){
+                                    $action .= '<a href="' . base_url("sell/add/" . $customer_ledger->st_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        } else if(isset($customer_ledger->pay_rece_id) && !empty($customer_ledger->pay_rece_id)){
+                            if($this->app_model->have_access_role(CASHBOOK_MODULE_ID, "edit")){
+                                if (in_array($customer_ledger->department_id, $department_ids)){
+                                    $action .= '<a href="' . base_url("reports/cashbook/" . $customer_ledger->pay_rece_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        } else if(isset($customer_ledger->xrf_id) && !empty($customer_ledger->xrf_id)){
+                            if($this->app_model->have_access_role(HALLMARK_XRF_MODULE_ID, "edit")){
+                                if (in_array(XRF_HM_LASER_DEPARTMENT_ACCOUNT_ID, $department_ids)){
+                                    $action .= '<a href="' . base_url("hallmark/xrf/" . $customer_ledger->xrf_id) . '"><span class="edit_button glyphicon glyphicon-edit data-href="#"" style="color : #419bf4" >&nbsp;</span></a>';
+                                }
+                            }
+                        }
+                    }
+                }
+                    
+//            if(empty($customer_ledger->gold_fine) && empty($customer_ledger->silver_fine) && empty($customer_ledger->amount) && $post_data['from_zero'] == 1 ){
+            if(empty($customer_ledger->gold_fine) && empty($customer_ledger->silver_fine) && empty($customer_ledger->amount) && $post_data['from_zero'] == 1 && isset($customer_ledger->group_name) ? $customer_ledger->group_name != '3' : ''){
+                $data2 = array();
+            } else {
+                
+                if($current_date != '' && $current_date != $customer_ledger->st_date){
+                    $row = array();
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '<b>Total</b>';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '';
+//                    $row[] = '<b>' . number_format((float) $total_grwt, 3, '.', '') . '</b>';
+//                    $row[] = '<b>' . number_format((float) $total_less, 3, '.', '') . '</b>';
+//                    $row[] = '<b>' . number_format((float) $total_net_wt, 3, '.', '') . '</b>';
+                    if ($total_gold_fine != 0 && $total_net_wt != 0) {
+                        $tunch = number_format((float) $total_gold_fine * 100 / (float) $total_net_wt, 2, '.', '');
+                    } else {
+                        $tunch = 0;
+                    }
+//                    $row[] = '<b>' . $tunch . '</b>';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '<b>' . number_format((float) $total_gold_fine, 3, '.', '') . '</b>';
+                    $row[] = '<b>' . number_format((float) $total_silver_fine, 3, '.', '') . '</b>';
+                    $row[] = '<b>' . number_format((float) $total_amount, 2, '.', '') . '</b>';
+                    $row[] = '<b>' . number_format((float) $total_c_amount, 2, '.', '') . '</b>';
+                    $row[] = '<b>' . number_format((float) $total_r_amount, 2, '.', '') . '</b>';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = $total_gold_fine;
+                    $row[] = $total_silver_fine;
+                    $row[] = $total_amount;
+                    $data2[] = $row;
+                    $daywise_total_gold_fine = $daywise_total_gold_fine + $total_gold_fine;
+                    $daywise_total_silver_fine = $daywise_total_silver_fine + $total_silver_fine;
+                    $daywise_total_amount = $daywise_total_amount + $total_amount;
+                } 
+                $current_date = $customer_ledger->st_date;
+                if(empty($customer_ledger->gold_fine) && empty($customer_ledger->silver_fine) && empty($customer_ledger->amount) && $post_data['from_zero'] == 1 && isset($customer_ledger->group_name) ? $customer_ledger->group_name == '3' : ''){
+                    $gold_total_grwt = 0;
+                    $gold_total_less = 0;
+                    $gold_total_net_wt = 0;
+
+                    $silver_total_grwt = 0;
+                    $silver_total_less = 0;
+                    $silver_total_net_wt = 0;
+                }
+//                if(empty($customer_ledger->gold_fine) && empty($customer_ledger->silver_fine) && empty($customer_ledger->amount) && $post_data['from_zero'] == 1){
+                if(empty($customer_ledger->gold_fine) && empty($customer_ledger->silver_fine) && empty($customer_ledger->amount) && $post_data['from_zero'] == 1 && isset($customer_ledger->group_name) ? $customer_ledger->group_name != '3' : ''){
+                    $total_grwt = 0;
+                    $total_less = 0;
+                    $total_net_wt = 0;
+                    $total_gold_fine = 0;
+                    $total_silver_fine = 0;
+                    $total_amount = 0;
+                    
+                    $gold_total_grwt = 0;
+                    $gold_total_less = 0;
+                    $gold_total_net_wt = 0;
+                    $gold_total_gold_fine = 0;
+                    $gold_total_silver_fine = 0;
+                    $daterange_total_amount = 0;
+
+                    $silver_total_grwt = 0;
+                    $silver_total_less = 0;
+                    $silver_total_net_wt = 0;
+                    $silver_total_gold_fine = 0;
+                    $silver_total_silver_fine = 0;
+//                    $silver_total_amount = 0;
+                } else {
+                    if (($display_opening != 1 || ($display_opening == 1 && $key != '0')) || ($display_opening == 1 && $key == '0')) {
+                        $total_grwt = number_format((float) $total_grwt, 3, '.', '') + number_format((float) $customer_ledger->grwt, 3, '.', '');
+                        $total_less = number_format((float) $total_less, 3, '.', '') + number_format((float) $customer_ledger->less, 3, '.', '');
+                        $total_net_wt = number_format((float) $total_net_wt, 3, '.', '') + number_format((float) $customer_ledger->net_wt, 3, '.', '');
+                        $total_gold_fine = number_format((float) $total_gold_fine, 3, '.', '') + number_format((float) $customer_ledger->gold_fine, 3, '.', '');
+                        $total_silver_fine = number_format((float) $total_silver_fine, 3, '.', '') + number_format((float) $customer_ledger->silver_fine, 3, '.', '');
+                        $total_amount = number_format((float) $total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                        
+                        if($key != '0'){
+                            if($customer_ledger->group_name == CATEGORY_GROUP_GOLD_ID){
+                                $gold_total_grwt = number_format((float) $gold_total_grwt, 3, '.', '') + number_format((float) $customer_ledger->grwt, 3, '.', '');
+                                $gold_total_less = number_format((float) $gold_total_less, 3, '.', '') + number_format((float) $customer_ledger->less, 3, '.', '');
+                                $gold_total_net_wt = number_format((float) $gold_total_net_wt, 3, '.', '') + number_format((float) $customer_ledger->net_wt, 3, '.', '');
+                                $gold_total_gold_fine = number_format((float) $gold_total_gold_fine, 3, '.', '') + number_format((float) $customer_ledger->gold_fine, 3, '.', '');
+//                                $gold_total_silver_fine = number_format((float) $gold_total_silver_fine, 3, '.', '') + number_format((float) $customer_ledger->silver_fine, 3, '.', '');
+                                $daterange_total_amount = number_format((float) $daterange_total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                            } else if($customer_ledger->group_name == CATEGORY_GROUP_SILVER_ID){
+                                $silver_total_grwt = number_format((float) $silver_total_grwt, 3, '.', '') + number_format((float) $customer_ledger->grwt, 3, '.', '');
+                                $silver_total_less = number_format((float) $silver_total_less, 3, '.', '') + number_format((float) $customer_ledger->less, 3, '.', '');
+                                $silver_total_net_wt = number_format((float) $silver_total_net_wt, 3, '.', '') + number_format((float) $customer_ledger->net_wt, 3, '.', '');
+//                                $silver_total_gold_fine = number_format((float) $silver_total_gold_fine, 3, '.', '') + number_format((float) $customer_ledger->gold_fine, 3, '.', '');
+                                $silver_total_silver_fine = number_format((float) $silver_total_silver_fine, 3, '.', '') + number_format((float) $customer_ledger->silver_fine, 3, '.', '');
+                                $daterange_total_amount = number_format((float) $daterange_total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                            } else if($customer_ledger->group_name == CATEGORY_GROUP_OTHER_ID){
+                                $daterange_total_amount = number_format((float) $daterange_total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                            } else if($customer_ledger->group_name == '4'){ // Payment Receipt, Journal, Cashbook
+                                if($customer_ledger->type_sort == 'Payment' || $customer_ledger->type_sort == 'Receipt' || $customer_ledger->type_sort == 'J Naam' || $customer_ledger->type_sort == 'J Jama' || $customer_ledger->type_sort == 'C R' || $customer_ledger->type_sort == 'C P' || $customer_ledger->type_sort == 'O Payment' || $customer_ledger->type_sort == 'O Receipt'){
+                                    $daterange_total_amount = number_format((float) $daterange_total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                                } elseif ($customer_ledger->type_sort == 'TR Naam' || $customer_ledger->type_sort == 'TR Jama') {
+                                    $gold_total_gold_fine = number_format((float) $gold_total_gold_fine, 3, '.', '') + number_format((float) $customer_ledger->gold_fine, 3, '.', '');
+                                    $silver_total_silver_fine = number_format((float) $silver_total_silver_fine, 3, '.', '') + number_format((float) $customer_ledger->silver_fine, 3, '.', '');
+                                    $daterange_total_amount = number_format((float) $daterange_total_amount, 2, '.', '') + number_format((float) $customer_ledger->amount, 2, '.', '');
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                $row = array();
+                $row[] = $action;
+                $row[] = (!empty(strtotime($customer_ledger->st_date))) ? date('d-m-Y', strtotime($customer_ledger->st_date)) : '';
+                $particular = ($customer_ledger->account_name != 'account_name') ? $customer_ledger->account_name : '' ;
+                $particular .= (isset($customer_ledger->interest_account_id) && $customer_ledger->interest_account_id == $customer_ledger->account_id) ? ' <a href="' . base_url("reports/interest/" . $customer_ledger->journal_id . "/" . $customer_ledger->account_id ) . '" target="_blank" title="Interest" ><b>Interest</b></a>' : '' ;
+                if($customer_ledger->type_sort == 'E' || $customer_ledger->type_sort == 'P' || $customer_ledger->type_sort == 'S'){
+                    if($display_line_item_remark_in_ledger == '1'){
+                        $particular .= '<small> - '.$customer_ledger->li_narration . '</small>';
+                    }
+                    if(PACKAGE_FOR == 'manek' && $account_group_id != DEPARTMENT_GROUP) {
+                        $charges_details = "SELECT GROUP_CONCAT(CONCAT(`ad`.`ad_name`, '@', `sell_item_charges_details`.`sell_item_charges_details_ad_amount`)) AS charges_details FROM `sell_item_charges_details`";
+                        $charges_details .= " JOIN `ad` ON `ad`.`ad_id` = `sell_item_charges_details`.`sell_item_charges_details_ad_id`";
+                        $charges_details .= " WHERE `sell_item_charges_details`.`sell_item_id` = " . $customer_ledger->sell_item_id;
+                        $charges_details = $this->crud->getFromSQLArray($charges_details);
+                        $charges_details = (!empty($charges_details)) ? $charges_details[0]['charges_details'] : '';
+                        $particular .= (isset($charges_details) && !empty($charges_details)) ? ' <br><small>' . $charges_details . '</small>' : '';
+                    }
+                }
+                if($customer_ledger->type_sort == 'Payment' || $customer_ledger->type_sort == 'Receipt'){
+                    $particular .= '<small> - '.$customer_ledger->narration . '</small>';
+                }
+                if($customer_ledger->type_sort == 'M R' || $customer_ledger->type_sort == 'M P'){
+                    $particular .= '<small> - '.$customer_ledger->metal_narration . '</small>';
+                }
+                if($customer_ledger->type_sort == 'GB S' || $customer_ledger->type_sort == 'GB P'){
+                    $particular .= ' @'.$customer_ledger->gold_rate . '<small> - '.$customer_ledger->gold_narration . '</small>';
+                }
+                if($customer_ledger->type_sort == 'SB S' || $customer_ledger->type_sort == 'SB P'){
+                    $particular .= ' @'.$customer_ledger->silver_rate;
+                }
+                if($customer_ledger->type_sort == 'J Naam'){
+                    $account_names = $this->crud->getFromSQL('SELECT account.account_name FROM journal_details JOIN account ON account.account_id = journal_details.account_id WHERE journal_details.journal_id = "' . $customer_ledger->journal_id . '" AND journal_details.type = 2');
+                    if(!empty($account_names)){
+                        $particular .= ' @ ';
+                        foreach($account_names as $an_row){
+                            $particular .= $an_row->account_name . ', ';
+                        }
+                    }
+                }
+                if($customer_ledger->type_sort == 'J Jama'){
+                    $account_names = $this->crud->getFromSQL('SELECT account.account_name FROM journal_details JOIN account ON account.account_id = journal_details.account_id WHERE journal_details.journal_id = "' . $customer_ledger->journal_id . '" AND journal_details.type = 1');
+                    if(!empty($account_names)){
+                        $particular .= ' @ ';
+                        foreach($account_names as $an_row){
+                            $particular .= $an_row->account_name . ', ';
+                        }
+                    }
+                }
+                $row[] = $particular;
+                $row[] = $customer_ledger->type_sort;
+                if($key == '0' && $customer_ledger->account_name == 'Opening Balance'){
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '';
+                    $row[] = '';
+                } else {
+                    $row[] = number_format((float) $customer_ledger->grwt, 3, '.', '');
+                    $row[] = number_format((float) $customer_ledger->less, 3, '.', '');
+                    $row[] = number_format((float) $customer_ledger->net_wt, 3, '.', '');
+                    $row[] = number_format((float) $customer_ledger->touch_id, 2, '.', '');
+                    $row[] = number_format((float) $customer_ledger->wstg, 3, '.', '');
+                }
+//                $row[] = number_format((float) $customer_ledger->grwt, 3, '.', '');
+//                $row[] = number_format((float) $customer_ledger->less, 3, '.', '');
+//                $row[] = number_format((float) $customer_ledger->net_wt, 3, '.', '');
+//                $row[] = number_format((float) $customer_ledger->touch_id, 2, '.', '');
+//                $row[] = number_format((float) $customer_ledger->wstg, 3, '.', '');
+                $row[] = number_format((float) $customer_ledger->gold_fine, 3, '.', '');
+                $row[] = number_format((float) $customer_ledger->silver_fine, 3, '.', '');
+                $row[] = number_format((float) $customer_ledger->amount, 2, '.', '');
+                $c_amt = '';
+                if(isset($customer_ledger->c_amt)){
+                    $c_amt = number_format((float) $customer_ledger->c_amt, 2, '.', '');
+                    $total_c_amount = $total_c_amount + $c_amt;
+                }
+                $row[] = $c_amt;
+                $r_amt = '';
+                if(isset($customer_ledger->r_amt)){
+                    $r_amt = number_format((float) $customer_ledger->r_amt, 2, '.', '');
+                    $total_r_amount = $total_r_amount + $r_amt;
+                }
+                $row[] = $r_amt;
+                $row[] = $customer_ledger->created_at;
+                $row[] = $customer_ledger->reference_no;
+                $row[] = $total_gold_fine;
+                $row[] = $total_silver_fine;
+                $row[] = $total_amount;
+                $data2[] = $row;
+            }
+        }
+		$daywise_total_gold_fine = $daywise_total_gold_fine + $total_gold_fine;
+        $daywise_total_silver_fine = $daywise_total_silver_fine + $total_silver_fine;
+        $daywise_total_amount = $daywise_total_amount + $total_amount;
+		
+		$data['gold_fine_cust_ledger']	= $daywise_total_gold_fine;
+		$data['silver_fine_cust_ledger'] = $daywise_total_silver_fine;
+		$data['amount_cust_ledger'] = $daywise_total_amount;
+		//print_r($data);die;
+		
+		
 //        print_r($data); exit;
         $data['company_name'] = $this->crud->get_column_value_by_id('settings', 'settings_value', array('settings_key' => 'company_name'));
         $data['company_contact'] = $this->crud->get_column_value_by_id('settings', 'settings_value', array('settings_key' => 'company_contact'));
