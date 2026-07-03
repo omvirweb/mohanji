@@ -15,9 +15,11 @@ class Auth extends CI_Controller
         $this->load->model("Appmodel", "app_model");
         $this->load->model('Crud', 'crud');
 //        $this->load->library(array('session', 'form_validation', 'email')); 
-        $this->logged_in_id = $this->session->userdata(PACKAGE_FOLDER_NAME.'is_logged_in')['user_id'];
-        $this->user_type = $this->session->userdata(PACKAGE_FOLDER_NAME.'is_logged_in')['user_type'];
-        $this->department_id = $this->session->userdata(PACKAGE_FOLDER_NAME.'is_logged_in')['default_department_id'];
+        $logged_in_data = $this->session->userdata(PACKAGE_FOLDER_NAME.'is_logged_in');
+        $logged_in_data = $this->session->userdata(PACKAGE_FOLDER_NAME.'is_logged_in');
+        $this->logged_in_id = $logged_in_data['user_id'] ?? null;
+        $this->user_type = $logged_in_data['user_type'] ?? null;
+        $this->department_id = $logged_in_data['default_department_id'] ?? null;
         $this->now_time = date('Y-m-d H:i:s');
     }
 
@@ -118,7 +120,12 @@ class Auth extends CI_Controller
         $this->db->join('account pm','pm.account_id = s.department_id','left');
         $this->db->join('category cat','cat.category_id = s.category_id','left');
         $this->db->where('(im.stock_method = 1 AND (s.grwt = 0 OR s.grwt != 0) OR (im.stock_method = 2 AND s.grwt != 0) OR (im.stock_method = 3 AND s.grwt != 0))');
-        $this->db->where_in('s.department_id',$department_ids);
+        // $this->db->where_in('s.department_id',$department_ids);
+        if(!empty($department_ids)){
+            $this->db->where_in('s.department_id',$department_ids);
+        } else {
+            $this->db->where('s.department_id', -1);
+        }
         $this->db->where_in('s.category_id',array($gold_fine_category_id,$silver_fine_category_id));
         $this->db->where_in('s.item_id',array($gold_fine_item_id,$silver_fine_item_id));
         $this->db->where('s.grwt != 0');

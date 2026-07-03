@@ -1,9 +1,12 @@
 <?php
 if (isset($this->session->userdata()[PACKAGE_FOLDER_NAME.'is_logged_in']) && !empty($this->session->userdata()[PACKAGE_FOLDER_NAME.'is_logged_in'])) {
     $logged_in_nickname = $this->session->userdata()[PACKAGE_FOLDER_NAME.'is_logged_in']['user_name'];
-    $logged_in_email = $this->session->userdata(PACKAGE_FOLDER_NAME.'company_data')->account_name;
+    // $logged_in_email = $this->session->userdata(PACKAGE_FOLDER_NAME.'company_data')->account_name;
+    $company_data = $this->session->userdata(PACKAGE_FOLDER_NAME.'company_data');
+    $logged_in_email = (is_object($company_data) && isset($company_data->account_name)) ? $company_data->account_name : '';
     $logged_in_id = $this->session->userdata()[PACKAGE_FOLDER_NAME.'is_logged_in']['user_id'];
-    $user_type = $this->session->userdata()[PACKAGE_FOLDER_NAME.'is_logged_in']['user_type'];
+    // $user_type = $this->session->userdata()[PACKAGE_FOLDER_NAME.'is_logged_in']['user_type'];
+    $user_type = $this->session->userdata()[PACKAGE_FOLDER_NAME.'is_logged_in']['user_type'] ?? null;
 //    $logged_in_profile_image = $this->session->userdata()[PACKAGE_FOLDER_NAME.'is_logged_in']['profile_image'];
 }
 $currUrl = $this->uri->segment(1);

@@ -14,6 +14,7 @@ ini_set('memory_limit', '1024M');
 |
 */
 defined('SHOW_DEBUG_BACKTRACE') OR define('SHOW_DEBUG_BACKTRACE', TRUE);
+define('PACKAGE_FOR', 'mohanji');
 
 /*
 |--------------------------------------------------------------------------
@@ -257,7 +258,7 @@ define("MACHINE_CHAIN_MODULE_ID", 51); //18.5
 define("BALANCE_ID", 47); //18.3
 define("SERVER_SHUTDOWN_MODULE_ID", 49); //20
 define('SERVER_SHUTDOWN_URL','http://'.$_SERVER['HTTP_HOST'].'/hrdshut/shutdown.php');
-
+define('ALLOW_SERVER_SHUTDOWN', '1');
 // SMS API
 define('SEND_SMS_USER_ID', 'GOLDAC');
 define('SEND_SMS_USERPASSWORD', 'GOLDAC@123');
