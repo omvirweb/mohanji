@@ -134,7 +134,7 @@ class Cron extends CI_Controller
         $this->load->library('email');
         $this->email->initialize($config);
         $this->email->clear(TRUE);
-        $this->email->from('backup@sala.local', 'DB Backup');
+        $this->email->from('vipuldshah77@gmail.com', 'DB Backup');
         $this->email->to($to);
         $this->email->subject('DB Backup: ' . $db_name . ' - ' . date('d-m-Y H:i'));
         $this->email->message(

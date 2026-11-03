@@ -14,5 +14,5 @@ $config['email'] = array(
     'wordwrap'     => TRUE,
     'newline'      => "\r\n",
     'crlf'         => "\r\n",
-    'send_mail_to' => 'vivekjewelbook@gmail.com'
+    'send_mail_to' => 'Sonideep1000@gmail.com'
 );
