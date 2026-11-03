@@ -62,5 +62,111 @@ class Cron extends CI_Controller
         $this->email->send();
         echo "Email Sent";
     }
-    
+
+        /**
+     * Backup DB with mysqldump (gzip) and email it to config 'send_mail_to'.
+     * CLI: php index.php cron db_backup_email
+     */
+    function db_backup_email(){
+        @set_time_limit(0);
+
+        // ---- Load SMTP config + recipient ----
+        $this->config->load('db_backup', TRUE);
+        $config  = $this->config->item('email', 'db_backup');
+        $to      = $config['send_mail_to'];
+        unset($config['send_mail_to']); // not an email-library setting
+
+        // ---- Paths ----
+        $db_name  = $this->db->database;
+        $tmp_dir  = rtrim(sys_get_temp_dir(), '/');
+        $base     = $tmp_dir . '/' . $db_name . '_' . date('Y-m-d_H-i-s');
+        $sql_path = $base . '.sql';
+        $gz_path  = $sql_path . '.gz';
+        $err_path = $base . '.err';
+        $cnf_path = tempnam($tmp_dir, 'mycnf_');
+
+        // ---- Credentials file (keeps password out of process list) ----
+        $cnf  = "[client]\n";
+        $cnf .= 'user="' . addcslashes($this->db->username, '"\\') . "\"\n";
+        $cnf .= 'password="' . addcslashes($this->db->password, '"\\') . "\"\n";
+        $cnf .= 'host="' . $this->db->hostname . "\"\n";
+        if (!empty($this->db->port)) {
+            $cnf .= 'port=' . (int) $this->db->port . "\n";
+        }
+        file_put_contents($cnf_path, $cnf);
+        chmod($cnf_path, 0600);
+
+        // ---- 1. Dump ----
+        $cmd = 'mysqldump --defaults-extra-file=' . escapeshellarg($cnf_path)
+             . ' --single-transaction --quick --routines --triggers '
+             . escapeshellarg($db_name)
+             . ' > ' . escapeshellarg($sql_path)
+             . ' 2> ' . escapeshellarg($err_path);
+        exec($cmd, $out, $code);
+        @unlink($cnf_path);
+
+        if ($code !== 0 || !file_exists($sql_path) || filesize($sql_path) === 0) {
+            $err = file_exists($err_path) ? file_get_contents($err_path) : 'mysqldump not found or exec() disabled';
+            echo "<span style='color:red;'><b>Error : Database backup failed.</b></span><pre>" . htmlspecialchars($err) . "</pre>";
+            @unlink($sql_path);
+            @unlink($err_path);
+            return;
+        }
+        @unlink($err_path);
+
+        // ---- 2. Compress ----
+        exec('gzip -f ' . escapeshellarg($sql_path), $out2, $code2);
+        if ($code2 !== 0 || !file_exists($gz_path)) {
+            echo "<span style='color:red;'><b>Error : Could not compress backup.</b></span>";
+            @unlink($sql_path);
+            return;
+        }
+
+        // Gmail attachment limit is 25 MB
+        $size_mb = filesize($gz_path) / 1048576;
+        if ($size_mb > 24) {
+            @unlink($gz_path);
+            echo "<span style='color:red;'><b>Error : Backup is " . round($size_mb, 2) . " MB, too large to email (Gmail limit 25 MB).</b></span>";
+            return;
+        }
+
+        // ---- 3. Send email ----
+        $this->load->library('email');
+        $this->email->initialize($config);
+        $this->email->clear(TRUE);
+        $this->email->from('backup@sala.local', 'DB Backup');
+        $this->email->to($to);
+        $this->email->subject('DB Backup: ' . $db_name . ' - ' . date('d-m-Y H:i'));
+        $this->email->message(
+            "Hi,\n\n" .
+            "Database backup is attached.\n\n" .
+            "Database: " . $db_name . "\n" .
+            "Date: " . date('d-m-Y H:i:s') . "\n" .
+            "Size: " . round($size_mb, 2) . " MB\n"
+        );
+        $this->email->attach($gz_path);
+
+        if ($this->email->send()) {
+            echo "Success : Backup emailed to " . $to;
+        } else {
+            echo "<span style='color:red;'><b>Error : Email failed.</b></span><pre>" .
+                 $this->email->print_debugger(array('headers')) . "</pre>";
+        }
+
+        // ---- 4. Cleanup ----
+        @unlink($gz_path);
+    }
+
+    function test_mail(){
+    $this->config->load('db_backup', TRUE);
+    $config = $this->config->item('email', 'db_backup');
+    $to = $config['send_mail_to']; unset($config['send_mail_to']);
+    $this->load->library('email');
+    $this->email->initialize($config);
+    $this->email->from($config['smtp_user'], 'Test');
+    $this->email->to($to);
+    $this->email->subject('SMTP test');
+    $this->email->message('works');
+    echo $this->email->send() ? 'SENT' : '<pre>'.$this->email->print_debugger().'</pre>';
+}
 }

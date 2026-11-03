@@ -26,22 +26,72 @@ class Backup extends CI_Controller
 
             $this->session->unset_userdata(PACKAGE_FOLDER_NAME.'download_backup_db');
 
-            $this->load->helper('file');
-            $this->load->dbutil();
-            $file_name = 'hrdk_' . date("Y-m-d-H-i-s") . '.sql.zip';
-            $prefs = array(
-                'format' => 'zip',
-                'filename' => $file_name,
-                'add_drop' => FALSE,
-                'foreign_key_checks' => FALSE,
-            );
-            $backup = $this->dbutil->backup($prefs);
-            $this->load->helper('download');
-            force_download($file_name, $backup);   
+            $this->download_database();
         } else {
             $this->session->set_flashdata('error_message', 'You have not permission to access this page.');
             redirect("/");
         }
+    }
+
+    function download(){
+        if (!$this->session->userdata(PACKAGE_FOLDER_NAME.'is_logged_in')) {
+            redirect('/auth/login/');
+        }
+
+        if (!$this->applib->have_access_role(BACKUP_MODULE_ID,"allow")) {
+            $this->session->set_flashdata('error_message', 'You have not permission to access this page.');
+            redirect("/");
+        }
+
+        $this->download_database();
+    }
+
+    private function download_database(){
+        $backup = "-- Database backup generated " . date("Y-m-d H:i:s") . "\n";
+        $backup .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+
+        foreach ($this->db->list_tables() as $table) {
+            $quoted_table = '`' . str_replace('`', '``', $table) . '`';
+            $create_result = $this->db->query("SHOW CREATE TABLE {$quoted_table}");
+            if ($create_result === FALSE) {
+                show_error('Unable to read database table structure: ' . $table);
+            }
+
+            $create_row = $create_result->row_array();
+            $create_statement = NULL;
+            foreach ($create_row as $key => $value) {
+                if (stripos($key, 'Create ') === 0) {
+                    $create_statement = $value;
+                    break;
+                }
+            }
+            if ($create_statement === NULL) {
+                show_error('Unable to read database table structure: ' . $table);
+            }
+
+            $backup .= $create_statement . ";\n\n";
+
+            $rows = $this->db->query("SELECT * FROM {$quoted_table}");
+            if ($rows === FALSE) {
+                show_error('Unable to read database table data: ' . $table);
+            }
+
+            foreach ($rows->result_array() as $row) {
+                $columns = array();
+                $values = array();
+                foreach ($row as $column => $value) {
+                    $columns[] = '`' . str_replace('`', '``', $column) . '`';
+                    $values[] = $this->db->escape($value);
+                }
+                $backup .= "INSERT INTO {$quoted_table} (" . implode(', ', $columns) . ") VALUES (" . implode(', ', $values) . ");\n";
+            }
+            $backup .= "\n";
+        }
+
+        $backup .= "SET FOREIGN_KEY_CHECKS=1;\n";
+        $file_name = 'sala_' . date("Y-m-d-H-i-s") . '.sql';
+        $this->load->helper('download');
+        force_download($file_name, $backup);
     }
     
     function index_old(){

@@ -226,6 +226,8 @@ immediately after the control sidebar -->
         });
         
         $(document).on('click', '.btn_backup_db', function (e) {
+            $(window).off('beforeunload');
+            $('.changed-input').removeClass('changed-input');
             $("#backup_db_modal").modal('show');
             $("#backup_db_password").attr('type','password');
         });
@@ -245,6 +247,7 @@ immediately after the control sidebar -->
                 $("#backup_db_password").focus();
                 return false;
             }
+            $(window).off('beforeunload');
             $("#ajax-loader").show();
             $.ajax({
                 type: "POST",
@@ -253,6 +256,7 @@ immediately after the control sidebar -->
                 dataType: 'json',
                 success: function (data) {
                     if(data.status == "success") {
+                        $(window).off('beforeunload');
                         $("#backup_db_modal").modal('hide');
                         show_notify("Downloading ReIndex",true);
                         $("#ajax-loader").hide();

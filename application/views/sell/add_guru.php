@@ -12,7 +12,7 @@
             <input type="hidden" name="order_id" id="order_id" value=""/>
             <input type="hidden" id="total_grwt_sell" value=""/>
             <input type="hidden" id="total_grwt_metal" value=""/>
-        <!-- Content Header (Page header) -->
+        <!-- Content Header (Page header) -->w
 
         <section class="content-header">
             <h1>
@@ -1402,6 +1402,7 @@ if (isset($order_lot_item)) { ?>
 <?php } ?>
     
     var pts_lineitem_objectdata = [];
+    display_lineitem_html(lineitem_objectdata);
     display_metal_html(metal_objectdata);
     display_gold_html(gold_objectdata);
     display_silver_html(silver_objectdata);

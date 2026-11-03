@@ -264,7 +264,7 @@ class Sell extends CI_Controller {
                         }
                         $sell_items->tunch_textbox = (isset($lot_item->tunch_textbox) && $lot_item->tunch_textbox == '1') ? '1' : '0';
                         $sell_items->type = $lot_item->type;
-                        $type_name = $this->crud->get_column_value_by_id('sell_type', 'type_name2', array('sell_type_id' => $lot_item->type));
+                        $type_name = $this->crud->get_column_value_by_id('sell_type', 'type_name', array('sell_type_id' => $lot_item->type));
                         $sell_items->type_name = $type_name;
                         $sell_items->category_name = $this->crud->get_column_value_by_id('category', 'category_name', array('category_id' => $lot_item->category_id));
                         $sell_items->group_name = $this->crud->get_column_value_by_id('category', 'category_group_id', array('category_id' => $lot_item->category_id));

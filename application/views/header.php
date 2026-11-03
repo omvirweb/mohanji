@@ -770,6 +770,11 @@ $segment3 = $this->uri->segment(3);
                                 <?php if($this->applib->have_access_role(SERVER_SHUTDOWN_MODULE_ID,"view") && ALLOW_SERVER_SHUTDOWN == '1') { ?>
                                     <li><a href="<?php echo SERVER_SHUTDOWN_URL; ?>" target="_blank" onclick="return confirm('Are you sure, You want to Server Shutdown?')">ॐ</a></li>
                                 <?php } ?>
+                                <?php if($this->applib->have_access_role(BACKUP_MODULE_ID,"allow")) { ?>
+                                    <li class="<?= ($segment1 == 'backup') ? 'active' : '' ?>">
+                                        <a href="<?= base_url() ?>backup/download/"><i class="fa fa-download"></i> Backup</a>
+                                    </li>
+                                <?php } ?>
                             </ul>
                             
                         </div>

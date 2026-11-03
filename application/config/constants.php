@@ -15,6 +15,7 @@ ini_set('memory_limit', '1024M');
 */
 defined('SHOW_DEBUG_BACKTRACE') OR define('SHOW_DEBUG_BACKTRACE', TRUE);
 define('PACKAGE_FOR', 'mohanji');
+define('GET_ALL_DATA_IN_ITEM_SELECTION_IN_SELL_PURCHASE', 1);
 
 /*
 |--------------------------------------------------------------------------
